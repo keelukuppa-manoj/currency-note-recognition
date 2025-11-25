@@ -10,7 +10,6 @@ st.title("Indian Currency Note Recognition (Single-note)")
 
 st.write("Upload an image of a single Indian currency note (₹10, ₹20, ₹50, ₹100, ₹200, ₹500, ₹2000).")
 
-# Class names in the exact order used during training
 CLASS_NAMES = ['10', '20', '50', '100', '200', '500', '2000']
 
 # Load TFLite model
@@ -20,32 +19,32 @@ def load_trained_model(path="model.tflite"):
     interpreter.allocate_tensors()
     return interpreter
 
-# Ensure model file exists
 if not os.path.exists("model.tflite"):
     st.error("Model file model.tflite not found in repo root. Place model.tflite in the repo and redeploy.")
 else:
     interpreter = load_trained_model("model.tflite")
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
+    input_shape = input_details[0]['shape']  # e.g., [1, 128, 128, 3]
+    input_dtype = input_details[0]['dtype']
 
-# File uploader
+# Use uploaded file or sample image for testing
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg","jpeg","png"])
-
-# Sample image from uploaded files
-sample_image_path = "/mnt/data/909ead23-8c4b-402e-aaca-40def6e66ebe.png"
 use_sample_image = st.checkbox("Use sample test image")
+
+sample_image_path = "/mnt/data/909ead23-8c4b-402e-aaca-40def6e66ebe.png"
 
 if uploaded_file or use_sample_image:
     if use_sample_image:
         image = Image.open(sample_image_path).convert("RGB")
     else:
         image = Image.open(uploaded_file).convert("RGB")
-    
+
     st.image(image, caption='Input image', use_column_width=True)
 
-    # Resize to training size (128x128)
-    img_resized = image.resize((128, 128))
-    img_arr = np.expand_dims(np.array(img_resized, dtype=np.float32)/255.0, axis=0)
+    # Resize image to match TFLite input shape
+    img_resized = image.resize((input_shape[1], input_shape[2]))
+    img_arr = np.expand_dims(np.array(img_resized, dtype=input_dtype) / 255.0, axis=0)
 
     # Run inference
     interpreter.set_tensor(input_details[0]['index'], img_arr)
