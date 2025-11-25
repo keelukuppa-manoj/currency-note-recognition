@@ -7,53 +7,52 @@ import os
 
 st.set_page_config(page_title="Indian Currency Note Recognizer", layout="centered")
 st.title("Indian Currency Note Recognition (Single-note)")
-
 st.write("Upload an image of a single Indian currency note (₹10, ₹20, ₹50, ₹100, ₹200, ₹500, ₹2000).")
 
-CLASS_NAMES = ['10', '20', '50', '100', '200', '500', '2000']
+# Path to TFLite model
+TFLITE_MODEL_PATH = "currency_model.tflite"  # Place your currency_model.tflite in repo root
+
+CLASS_NAMES = ['Tennote', 'Twentynote', 'Fiftynote', '1Hundrednote', '2Hundrednote', '5Hundrednote', '2Thousandnote']
 
 # Load TFLite model
 @st.cache(allow_output_mutation=True)
-def load_trained_model(path="model.tflite"):
-    interpreter = tf.lite.Interpreter(model_path=path)
+def load_tflite_model(model_path):
+    interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
     return interpreter
 
-if not os.path.exists("model.tflite"):
-    st.error("Model file model.tflite not found in repo root. Place model.tflite in the repo and redeploy.")
-else:
-    interpreter = load_trained_model("model.tflite")
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-    input_shape = input_details[0]['shape']  # e.g., [1, 128, 128, 3]
-    input_dtype = input_details[0]['dtype']
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# Use uploaded file or sample image for testing
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg","jpeg","png"])
-use_sample_image = st.checkbox("Use sample test image")
+if uploaded_file:
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption='Uploaded Image', use_column_width=True)
 
-sample_image_path = "/mnt/data/909ead23-8c4b-402e-aaca-40def6e66ebe.png"
+    # Resize and normalize
+    img_size = (128, 128)
+    img = image.resize(img_size)
+    img_arr = np.array(img, dtype=np.float32) / 255.0
+    img_arr = np.expand_dims(img_arr, axis=0)  # Add batch dimension
 
-if uploaded_file or use_sample_image:
-    if use_sample_image:
-        image = Image.open(sample_image_path).convert("RGB")
+    if not os.path.exists(TFLITE_MODEL_PATH):
+        st.error(f"Model file not found: {TFLITE_MODEL_PATH}. Place it in the repo root and redeploy.")
     else:
-        image = Image.open(uploaded_file).convert("RGB")
+        interpreter = load_tflite_model(TFLITE_MODEL_PATH)
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
 
-    st.image(image, caption='Input image', use_column_width=True)
+        # Ensure input dtype matches TFLite model
+        input_dtype = input_details[0]['dtype']
+        img_arr = img_arr.astype(input_dtype)
 
-    # Resize image to match TFLite input shape
-    img_resized = image.resize((input_shape[1], input_shape[2]))
-    img_arr = np.expand_dims(np.array(img_resized, dtype=input_dtype) / 255.0, axis=0)
+        interpreter.set_tensor(input_details[0]['index'], img_arr)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])[0]
 
-    # Run inference
-    interpreter.set_tensor(input_details[0]['index'], img_arr)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])[0]
+        st.write(f"Raw model output: {output_data}")
 
-    class_idx = int(np.argmax(output_data))
-    label = CLASS_NAMES[class_idx] if class_idx < len(CLASS_NAMES) else str(class_idx)
-    confidence = float(output_data[class_idx])
+        class_idx = int(np.argmax(output_data))
+        label = CLASS_NAMES[class_idx]
+        confidence = float(output_data[class_idx])
 
-    st.markdown(f"### Predicted: **₹{label}**")
-    st.markdown(f"**Confidence:** {confidence*100:.2f}%")
+        st.markdown(f"### Predicted: **₹{label.replace('note','')}**")
+        st.markdown(f"**Confidence:** {confidence*100:.2f}%")
