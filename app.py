@@ -10,11 +10,10 @@ st.title("Indian Currency Note Recognition (Single-note)")
 st.write("Upload an image of a single Indian currency note (₹10, ₹20, ₹50, ₹100, ₹200, ₹500, ₹2000).")
 
 # Path to TFLite model
-TFLITE_MODEL_PATH = "currency_model.tflite"  # Place your currency_model.tflite in repo root
+TFLITE_MODEL_PATH = "currency_model.tflite"  # Ensure this file exists in repo or download it
 
 CLASS_NAMES = ['Tennote', 'Twentynote', 'Fiftynote', '1Hundrednote', '2Hundrednote', '5Hundrednote', '2Thousandnote']
 
-# Load TFLite model
 @st.cache(allow_output_mutation=True)
 def load_tflite_model(model_path):
     interpreter = tf.lite.Interpreter(model_path=model_path)
@@ -34,16 +33,13 @@ if uploaded_file:
     img_arr = np.expand_dims(img_arr, axis=0)  # Add batch dimension
 
     if not os.path.exists(TFLITE_MODEL_PATH):
-        st.error(f"Model file not found: {TFLITE_MODEL_PATH}. Place it in the repo root and redeploy.")
+        st.error(f"Model file not found: {TFLITE_MODEL_PATH}. Please place it in the repo root or download it automatically.")
     else:
         interpreter = load_tflite_model(TFLITE_MODEL_PATH)
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
 
-        # Ensure input dtype matches TFLite model
-        input_dtype = input_details[0]['dtype']
-        img_arr = img_arr.astype(input_dtype)
-
+        img_arr = img_arr.astype(input_details[0]['dtype'])
         interpreter.set_tensor(input_details[0]['index'], img_arr)
         interpreter.invoke()
         output_data = interpreter.get_tensor(output_details[0]['index'])[0]
@@ -56,3 +52,4 @@ if uploaded_file:
 
         st.markdown(f"### Predicted: **₹{label.replace('note','')}**")
         st.markdown(f"**Confidence:** {confidence*100:.2f}%")
+
