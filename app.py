@@ -9,11 +9,12 @@ st.set_page_config(page_title="Indian Currency Note Recognizer", layout="centere
 st.title("Indian Currency Note Recognition (Single-note)")
 st.write("Upload an image of a single Indian currency note (₹10, ₹20, ₹50, ₹100, ₹200, ₹500, ₹2000).")
 
-# Correct model path in your repo
+# Path to TFLite model in repo root
 TFLITE_MODEL_PATH = "currency_model.tflite"
 
-# Multi-class labels
-CLASS_NAMES = ['Tennote', 'Twentynote', 'Fiftynote', '1Hundrednote', '2Hundrednote', '5Hundrednote', '2Thousandnote']
+# Class names in the exact order used during training
+CLASS_NAMES = ['Tennote', 'Twentynote', 'Fiftynote', '1Hundrednote', 
+               '2Hundrednote', '5Hundrednote', '2Thousandnote']
 
 # Load TFLite model
 @st.cache(allow_output_mutation=True)
@@ -28,7 +29,7 @@ if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption='Uploaded Image', use_column_width=True)
 
-    # Resize and normalize the image
+    # Preprocess image: resize and normalize
     img_size = (128, 128)
     img = image.resize(img_size)
     img_arr = np.array(img, dtype=np.float32) / 255.0
@@ -41,22 +42,22 @@ if uploaded_file:
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
 
-        # Make sure dtype matches the model
+        # Match input dtype
         img_arr = img_arr.astype(input_details[0]['dtype'])
 
-        try:
-            interpreter.set_tensor(input_details[0]['index'], img_arr)
-            interpreter.invoke()
-            output_data = interpreter.get_tensor(output_details[0]['index'])[0]
+        # Set tensor and run inference
+        interpreter.set_tensor(input_details[0]['index'], img_arr)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])[0]
 
-            st.write(f"Raw model output: {output_data}")
+        # Debug: show raw model output
+        st.write(f"Raw model output: {output_data}")
 
-            class_idx = int(np.argmax(output_data))
-            label = CLASS_NAMES[class_idx]
-            confidence = float(output_data[class_idx])
+        # Get predicted class
+        class_idx = int(np.argmax(output_data))
+        label = CLASS_NAMES[class_idx]
+        confidence = float(output_data[class_idx])
 
-            st.markdown(f"### Predicted: **₹{label.replace('note','')}**")
-            st.markdown(f"**Confidence:** {confidence*100:.2f}%")
-
-        except Exception as e:
-            st.error(f"Error running the model: {e}")
+        # Display result
+        st.markdown(f"### Predicted: **₹{label.replace('note','')}**")
+        st.markdown(f"**Confidence:** {confidence*100:.2f}%")
